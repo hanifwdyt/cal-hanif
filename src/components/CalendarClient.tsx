@@ -23,7 +23,11 @@ function getMondayFirstOffset(date: Date): number {
 }
 
 function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+  // Use local date components — toISOString() would give UTC which shifts by timezone offset
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function getEventsForDate(events: CalEvent[], date: Date): CalEvent[] {
