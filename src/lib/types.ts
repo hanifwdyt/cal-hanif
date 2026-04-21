@@ -21,6 +21,7 @@ export interface CalEvent {
   category: Category;
   note: string | null;
   repeat: 'none' | 'weekly';  // weekly = recurring every week
+  date: string | null;        // YYYY-MM-DD — if set, only show on this specific date
   created_at: string;
   updated_at: string;
 }
@@ -33,6 +34,7 @@ export interface CalEventInput {
   category?: Category;
   note?: string | null;
   repeat?: 'none' | 'weekly';
+  date?: string | null;
 }
 
 export const DAY_LABELS: Record<DayOfWeek, string> = {

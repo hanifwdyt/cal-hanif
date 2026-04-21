@@ -35,6 +35,19 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_events_category ON events(category);
   `);
 
+  // Migration: add date column if not exists (idempotent)
+  try {
+    db.exec(`ALTER TABLE events ADD COLUMN date TEXT`);
+  } catch {
+    // Column already exists — safe to ignore
+  }
+
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_events_date ON events(date)`);
+  } catch {
+    // Index already exists
+  }
+
   dbInstance = db;
   return db;
 }
@@ -42,8 +55,8 @@ export function getDb(): Database.Database {
 export function insertEvent(input: CalEventInput): CalEvent {
   const db = getDb();
   return db.prepare(`
-    INSERT INTO events (title, day, time_start, time_end, category, note, repeat)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO events (title, day, time_start, time_end, category, note, repeat, date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     RETURNING *
   `).get(
     input.title,
@@ -52,12 +65,13 @@ export function insertEvent(input: CalEventInput): CalEvent {
     input.time_end ?? null,
     input.category ?? 'other',
     input.note ?? null,
-    input.repeat ?? 'weekly',
+    input.repeat ?? 'none',
+    input.date ?? null,
   ) as CalEvent;
 }
 
 export function listEvents(): CalEvent[] {
-  return getDb().prepare('SELECT * FROM events ORDER BY day, time_start').all() as CalEvent[];
+  return getDb().prepare('SELECT * FROM events ORDER BY date, day, time_start').all() as CalEvent[];
 }
 
 export function deleteEvent(id: number): boolean {

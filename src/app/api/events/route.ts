@@ -8,8 +8,16 @@ const VALID_DAYS: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', '
 const VALID_CATEGORIES: Category[] = ['wfo', 'wfh', 'gym', 'renang', 'lari', 'client', 'belajar', 'ibadah', 'personal', 'other'];
 const VALID_REPEATS = ['none', 'weekly'];
 
+const JS_DAY_TO_DOW: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
 function auth(req: NextRequest): boolean {
   return req.headers.get('x-minion-secret') === MINION_SECRET;
+}
+
+function deriveDayFromDate(dateStr: string): DayOfWeek | null {
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return null;
+  return JS_DAY_TO_DOW[d.getDay()];
 }
 
 export async function GET(req: NextRequest) {
@@ -30,14 +38,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'invalid body' }, { status: 400 });
   }
 
-  const { title, day, time_start, time_end, category, note, repeat } = body;
+  const { title, day, time_start, time_end, category, note, repeat, date } = body;
 
   if (!title || typeof title !== 'string') {
     return NextResponse.json({ ok: false, error: 'title required' }, { status: 400 });
   }
-  if (!VALID_DAYS.includes(day)) {
-    return NextResponse.json({ ok: false, error: `day must be one of: ${VALID_DAYS.join(', ')}` }, { status: 400 });
+
+  // If date provided, derive day automatically. Otherwise day is required.
+  let resolvedDay: DayOfWeek;
+  if (date) {
+    const derived = deriveDayFromDate(String(date));
+    if (!derived) return NextResponse.json({ ok: false, error: 'invalid date format, use YYYY-MM-DD' }, { status: 400 });
+    resolvedDay = day && VALID_DAYS.includes(day) ? day : derived;
+  } else {
+    if (!VALID_DAYS.includes(day)) {
+      return NextResponse.json({ ok: false, error: `day required when no date provided. Must be one of: ${VALID_DAYS.join(', ')}` }, { status: 400 });
+    }
+    resolvedDay = day;
   }
+
   if (category && !VALID_CATEGORIES.includes(category)) {
     return NextResponse.json({ ok: false, error: `category must be one of: ${VALID_CATEGORIES.join(', ')}` }, { status: 400 });
   }
@@ -47,12 +66,13 @@ export async function POST(req: NextRequest) {
 
   const event = insertEvent({
     title: String(title).slice(0, 100),
-    day,
+    day: resolvedDay,
     time_start: time_start ? String(time_start).slice(0, 5) : null,
     time_end: time_end ? String(time_end).slice(0, 5) : null,
     category: category ?? 'other',
     note: note ? String(note).slice(0, 300) : null,
-    repeat: repeat ?? 'weekly',
+    repeat: date ? 'none' : (repeat ?? 'weekly'),
+    date: date ? String(date).slice(0, 10) : null,
   });
 
   return NextResponse.json({ ok: true, event });
@@ -69,7 +89,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'id required' }, { status: 400 });
   }
 
-  const allowed = ['title', 'day', 'time_start', 'time_end', 'category', 'note', 'repeat'];
+  const allowed = ['title', 'day', 'time_start', 'time_end', 'category', 'note', 'repeat', 'date'];
   const input: Record<string, unknown> = {};
   for (const k of allowed) {
     if (body[k] !== undefined) input[k] = body[k];

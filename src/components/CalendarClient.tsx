@@ -22,10 +22,18 @@ function getMondayFirstOffset(date: Date): number {
   return d === 0 ? 6 : d - 1;
 }
 
+function toDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
 function getEventsForDate(events: CalEvent[], date: Date): CalEvent[] {
-  const jsDay = date.getDay(); // 0=Sun, 1=Mon...
+  const dateStr = toDateStr(date);
+  const jsDay = date.getDay();
   const mondayIdx = jsDay === 0 ? 6 : jsDay - 1;
-  return events.filter(ev => DAY_TO_IDX[ev.day] === mondayIdx);
+  return events.filter(ev => {
+    if (ev.date) return ev.date === dateStr;          // specific dated event
+    return DAY_TO_IDX[ev.day] === mondayIdx;          // recurring weekly
+  });
 }
 
 interface Props {
